@@ -1,0 +1,359 @@
+---
+title: "PROYECTO FINAL"
+author: 
+    - "Monserrat Vega Vázquez"
+    - "Fernanda Salazar"
+    - "Jaqueline Troche Ramírez"
+date: "2022-12-17"
+output: 
+  html_document:
+    toc: True
+    number_sections: True
+    theme: "journal"
+    highlight: kate
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+datos <- read.csv("CO2 Emissions_Canada.csv") %>%
+  filter(Fuel.Type!="N")
+attach(datos)
+
+TipoCom <- NA
+TipoCom[Fuel.Type=="X"] <- "Regular gasoline"   
+TipoCom[Fuel.Type=="Z"] <- "Premium gasoline"  
+TipoCom[Fuel.Type=="D" ] <- "Diesel"   
+TipoCom[Fuel.Type=="E"] <- "Ethanol (E85)"
+
+base<- cbind(datos,TipoCom)%>%
+  select(TipoCom,CO2.Emissions.g.km., Fuel.Consumption.Comb..L.100.km.)%>%
+  rename(TipoCom=TipoCom,CO2=CO2.Emissions.g.km.,ConsumoGas=Fuel.Consumption.Comb..L.100.km.)
+
+attach(base)
+
+Combustible <- NA
+Combustible[TipoCom=="Diesel"  ] <-   1
+Combustible[TipoCom=="Ethanol (E85)"] <-2
+Combustible[TipoCom=="Premium gasoline"] <-   3
+Combustible[TipoCom=="Regular gasoline"] <-4
+base<- cbind(base,Combustible)
+```
+
+# Presentación del problema a estudiar
+
+## Antecedentes 
+<div style="text-align: justify">
+Las urbanizaciones masivas por parte del ser humano traen consigo problemas de impacto ambiental,como lo es el efecto invernadero el cual es causado por las fuertes emisiones de gases provocadas principalmente por dos factores: el industrial y el automovilístico. Al funcionar con combustibles fósiles se estima que la producción de gases CO2 ha aumentado un 33.5% desde la década de los 90's hasta la actualidad.
+Por tal motivo el presente trabajo busca hacer un análisis estadístico basado en las emisiones de CO2 producidas por el sector automovilístico, enfocándonos en tres principales variables que son: tipo de combustible, nivel de emisión producida y el nivel de consumo de combustible. Estos datos fueron obtenidos del sitio web Kaggle, que a su vez fueron extraídos del sitio web oficial de datos abiertos del gobierno de Canadá. 
+<div/>
+
+## Descripción de los datos
+```{r}
+library(ggplot2)
+nivel.tipo <- as.factor(TipoCom)
+ggplot(base,aes(ConsumoGas,CO2, color=TipoCom))+
+  geom_jitter() +
+  labs( x = "Comsumo de gasolina (L/100 km)", y = "Emision de CO2 (g/km)",
+ title ="Emision de CO2 y Consumo de gasolina por tipo de combustible",
+ subtitle = "Canada")
+  
+```
+<div style="text-align: justify">
+
+Del análisis exploratorio que se hizo de los datos se encontró que existe una correlación fuerte y positiva entre el Consumo de Gasolina y la emisión de CO2, es decir, a mayor consumo de gasolina mayor emisión de CO2. Así como que existía una asimetría a la derecha para ambas variables cualitativas (Emisión de CO2 g/100km y Consumo de combustible L/km), además, con el diagrama de caja y brazos para la emisión de CO2 por tipo de combustible se concluyo que podría existir una similitud entre la dispersión de los datos entre la gasolina premium y la regular, así como entre el diesel y ethanol.
+
+Además, se observa que existe una diferencia entre los tipos de combustible.El tipo de combustible que produce mas CO2 es la Gasolina premium, a diferencia del Diesel que produce las menores emisiones de CO2, ya que su valor sus valores oscilan entre los $150$ a los $350 g/km$. Además, podemos decir que en algún punto podría ser indistinto usar gasolina premium a gasolina regular, ya que ambas siguen las misma tendencia. Finalmente el Ethanol es un combustible con más emisiones de CO2 que el Diesel pero mucho menores que cualquier tipo de Gasolina.
+
+<div/>
+
+# Inferencia Estadística Clásica
+
+## Estimación de intervalos de confianza
+
+```{r}
+
+library(dplyr)
+CO2_regular <- filter(base,Combustible==4)%>%
+  select(CO2)
+CO2_premium <- filter(base,Combustible==3)%>%
+  select(CO2)
+
+CO2_disel <- filter(base,Combustible==1)%>%
+  select(CO2)
+CO2_etanol<- filter(base,Combustible==2)%>%
+  select(CO2)
+
+
+
+base %>%
+  group_by(TipoCom)%>%
+  summarize(media=mean(CO2,na.rm=TRUE),
+            var=var(CO2,na.rm=T))
+
+```
+
+<div style="text-align: justify">
+De acuerdo a la tabla y lo observado en el análisis explotario vamos a suponer varianzas iguales entre la gasolina regular y la premium, así como entre el diesel y el ethanol, para calcular los intervalos de confianza.
+
+**a) Estime el intervalo de confianza al 93 % para la comparación de medias entre los distintos grupos.**
+<div/>
+
+```{r,warning=FALSE}
+
+#intervalos para grupos con comparación de medias
+
+
+a<- t.test(CO2_premium$CO2,CO2_regular$CO2,paired = F,var.equal = T,conf.level = 0.93)$conf.int[1:2]
+
+b<- t.test(CO2_etanol$CO2,CO2_disel$CO2,paired = F,var.equal = T,conf.level = 0.93)$conf.int[1:2]
+#intervalos para grupos con varianza distintas
+
+c<- t.test(CO2_premium$CO2,CO2_etanol$CO2,paired = F,var.equal = F,conf.level = 0.93)$conf.int[1:2]
+
+d<- t.test(CO2_premium$CO2,CO2_disel$CO2,paired = F,var.equal = F,conf.level = 0.93)$conf.int[1:2]
+
+e<- t.test(CO2_regular$CO2,CO2_etanol$CO2,paired = F,var.equal = F,conf.level = 0.93)$conf.int[1:2]
+
+
+f<- t.test(CO2_regular$CO2,CO2_disel$CO2,paired = F,var.equal = F,conf.level = 0.93)$conf.int[1:2]
+
+g <- c("premium.regular","etanol.diesel","premium.etanol","premium.diesel","regular.etanol","regular.diesel")
+intervalos <- as_tibble(cbind(g,rbind(a,b,c,d,e,f)))
+colnames(intervalos) <- c("mu1-mu2","Inferior","Superior")
+intervalos
+
+```
+
+<div style="text-align: justify">
+
+**b) Mencione los supuestos que está haciendo sobre cada población, si las muestras son dependientes o independientes y si se puede pensar en varianzas poblacionales iguales. Para esto último estime un intervalo de confianza del 98 % para verificar e interprete el resultado.**
+
+Para cada grupo, estamos suponiendo independencia y normalidad, es decir, la emisión de CO2 con gasolina regular no depende de la emisión de CO2 con gasolina premium, y así con cualquiera de los grupos. 
+
+Como se menciono anteriormente se proponen varianzas iguales entre la gasolina regular y la premium, así como entre el diesel y el ethanol ya que gráficamente y numéricamente se encontró similitud entre estos 2 grupos de combustibles, excluyendo esta similitud de varianza para los demás grupos de combustibles.
+
+<div/>
+
+```{r , warning=FALSE}
+
+a1<- var.test(CO2_premium$CO2,CO2_regular$CO2,conf.level = 0.98)$conf.int[1:2] #No se rechaza Ho, puesto que el intervalo de confianza incluye el 1,entonces se concluye que las varianzas de las emisiones de CO2 entre ambos tipos de gasolina (gasolina premium y gasolina regular) son iguales.
+
+a2<- var.test(CO2_etanol$CO2,CO2_disel$CO2,conf.level = 0.98)$conf.int[1:2] #No se rechaza Ho ,puesto que el intervalo de confianza incluye el 1, entonces se concluye que las varianzas de las emisiones de CO2 entre ambos tipos de combustible(etanol y diesel) son iguales.
+
+a3 <- var.test(CO2_premium$CO2,CO2_etanol$CO2,conf.level = 0.98)$conf.int[1:2] # se rechaza Ho,ya que el intervalo no contiene al 1, por lo que las varianzas no son iguales entre la gasolina premium y el ethanol.
+
+a4<- var.test(CO2_premium$CO2,CO2_disel$CO2,conf.level = 0.98)$conf.int[1:2] # se rechaza Ho,ya que el intervalo no contiene al 1, por lo que las varianzas no son iguales entre la gasolina premium y el diesel.
+
+a5 <- var.test(CO2_regular$CO2,CO2_etanol$CO2,conf.level = 0.98)$conf.int[1:2]# se rechaza Ho,ya que el intervalo no contiene al 1, por lo que las varianzas no son iguales entre la gasolina regular y el ethanol.
+
+a6 <- var.test(CO2_regular$CO2,CO2_disel$CO2,conf.level = 0.98)$conf.int[1:2] # se rechaza Ho,ya que el intervalo no contiene al 1, por lo que las varianzas no son iguales entre la gasolina regular y el diesel.
+
+intervalos.var <- as_tibble(cbind(g,rbind(a1,a2,a3,a4,a5,a6)))
+colnames(intervalos.var) <- c("sigma2x/sigma2y","Inferior","Superior")
+intervalos.var
+
+
+```
+
+<div style="text-align: justify">
+
+**c)Interprete los resultados obtenidos en el contexto del problema a estudiar.**
+
+Con los intervalos obtenidos para la comparación de medias entre los distintos grupos, encontramos que las emisiones de Co2 con gasolina regular produce menos CO2 que la gasolina premium,sin embargo, ambos tipos de combutible son los que presentan una mayor emisión de CO2, mientras que se puede observar que los combutibles restantes como el diesel y el ethanol producen menores cantidades de CO2, pero entre el diesel y el ethanol, este ultimo produce una cantidad promedio de Co2 mayor.
+
+En la siguiente tabla se observan los diferentes tipos de combustible y su posición frente a las emisiones de CO2 que emite cada uno de ellos:
+
+Tipo de combustible    | Emisiones de CO2  | 
+---------             |--------------------     
+*Gasolina premium*    |     Muy alta             
+*Gasolina regular*    |     Alta            
+*Ethanol*    |    Intermedia               
+*Diesel*     |      Baja             
+
+
+
+
+**d)¿Las conclusiones mediante la estimación de intervalos de confianza están de acuerdo con lo encontrado en la fase exploratoria?**
+
+De acuerdo a los intervalos de confianza para la comparación de medias al 93% y 98% para la varianzas realizados anteriormente, podemos asegurar que lo encontrado en el análisis explotatorio mantiene esa relación existente entre los diferentes grupos, en sus medias, ya que numéricamente se expreso lo visto en las gráficas, es decir, se comprobó que la gasolina en cualquier presentación emite en promedio más emisiones de CO2 por ser de más uso en los automóviles, mientras que los combustibles de menos uso por parte de los automóviles disminuyen las cantidades de CO2. Respecto a sus varianzas vemos el mismo comportamientos en los grupos de combustible de mayor y menor uso, es decir pueden llegar a tener varianzas iguales. 
+
+## Pruebas de hipótesis paramétricas
+
+**a) Realice el contraste de hipótesis bilateral para la diferencia de medias con un nivel de significancia del 7%.**
+
+<div/>
+
+```{r,warning=FALSE }
+
+# Las hipótesis a contrastar son: H0:mu1=mu2   vs  Ha: mu1!= mu2
+# O bien: H0: mu1-mu2=0   vs  Ha: mu1-mu2 != 0
+
+#El estadístico de prueba es el t,que se usa para la comparación de medias, cuando la varianza es desconocida, este estadístico sigue la distribución t-student.
+
+# HO:La emisión media de CO2 con gasolina premium no es diferente a la emisión de CO2 con gasolina regular.
+# H1:La emisión media de CO2 con gasolina premium es diferente a la emisión de CO2 con gasolina regular.
+
+(b1<- t.test(CO2_premium$CO2,CO2_regular$CO2,paired = F,var.equal = T,conf.level = 0.93))
+#Se rechaza HO, lo que se puede concluir con un nivel de confianza del 93% es que la emisión de CO2 con gasolina no es igual a la emisión de CO2 con gasolina regular. Dado que los intervalos son positivos se puede decir que la Gasolina premium produce más CO2 que la gasolina regular.
+
+
+# HO:La emisión media de CO2 con etanol no es diferente a la emisión de CO2 con diesel.
+# H1:La emisión media de CO2 con etanol es diferente a la emisión de CO2 con diesel.
+
+(b2<-t.test(CO2_etanol$CO2,CO2_disel$CO2,paired = F,var.equal = T,conf.level = 0.93))
+
+#Se rechaza HO, se puede concluir que con un nivel de confianza del 93%, que la emisión promedio de CO2 con etano no es igual a la emisión de CO2 con diesel. Como el intervalo es positivo, podemos concluir que la emisión promedio de CO2 con etanol es mayor a emisión promedio de CO2 con diesel.
+
+
+# HO:La emisión media de CO2 con gasolina premium no es diferente a la emisión de CO2 con ethanol.
+# H1:La emisión media de CO2 con gasolina premium es diferente a la emisión de CO2 con ethanol.
+
+(b3<-t.test(CO2_premium$CO2,CO2_etanol$CO2,paired = F,var.equal = F,conf.level = 0.93))
+#Se rechaza Ho, se puede concluir que con un nivel de confianza del 93%, que la emisión promedio de CO2 con gasolina premium no es igual a la emisión de CO2 con ethanol. Como el intervalo es negativo, podemos concluir que la emisión promedio de CO2 con gasolina premium  es menor a emision promedio de Co2 con ethanol.
+
+# HO:La emision media de CO2 con gasolina premium no es diferente a la emision de Co2 con diesel.
+# H1:La emision media de CO2 con gasolina premium es diferente a la emision de Co2 con diesel.
+
+(b4<-t.test(CO2_premium$CO2,CO2_disel$CO2,paired = F,var.equal = F,conf.level = 0.93))
+
+#Se rechaza Ho, se puede concluir que con un nivel de confianza del 93%, que la emisión promedio de Co2 con gasolina premium no es igual a la emisión de CO2 con diesel. Como el intervalo es positivo, podemos concluir que la emisión promedio de CO2 con gasolina premium es mayor a emisión promedio de CO2 con diesel
+
+
+# HO:La emision media de CO2 con gasolina regular no es diferente a la emisión de CO2 con etanol
+# H1:La emision media de CO2 con gasolina regularium es diferente a la emisión de CO2 con etanol.
+(b5<-t.test(CO2_regular$CO2,CO2_etanol$CO2,paired = F,var.equal = F,conf.level = 0.93))
+
+#Se rechaza Ho, se puede concluir que con un nivel de confianza del 93%, que la emisión promedio de CO2 con gasolina regular no es igual a la emisión de CO2 con etanol. Como el intervalo es negativo, podemos concluir que la emisión promedio de CO2 con gasolina regular es menor a emisión promedio de CO2 con ethanol.
+
+
+# HO:La emisión media de CO2 con gasolina regular no es diferente/es igual a la emisión de CO2 con diesel.
+# H1:La emisión media de CO2 con gasolina regular es diferente/no es igual a la emisión de CO2 con diesel.
+(b6<-t.test(CO2_regular$CO2,CO2_disel$CO2,paired = F,var.equal = F,conf.level = 0.93))
+
+#No se rechaza Ho, se puede concluir que con un nivel de confianza del 93%, que la emisión promedio de CO2 con gasolina regular es igual a la emisión de CO2 con diesel.El intervalo contiene al 0.
+
+
+```
+
+La toma de decisión se hace en base al p-value.
+
+### Regiones críticas y valor t encontrado
+```{r,warning=FALSE}
+
+n<- base %>%
+  group_by(TipoCom)%>%
+  summarize(n=n())
+
+t1 <- c(qt(0.07/2,df=as.integer(n[3,2] + n[4,2]-2),lower.tail = T), qt(0.07/2,df=as.integer(n[3,2]+n[4,2]-2),lower.tail = F),b1$statistic  )
+
+t2 <- c(qt(0.07/2,df=as.integer(n[2,2] + n[1,2]-2),lower.tail = T), qt(0.07/2,df=as.integer(n[2,2]+n[1,2]-2),lower.tail = F),b2$statistic)
+
+t3 <- c(qt(0.07/2,df=as.integer(n[3,2] + n[2,2]-2),lower.tail = T), qt(0.07/2,df=as.integer(n[3,2]+n[2,2]-2),lower.tail = F),b3$statistic)
+
+t4 <- c(qt(0.07/2,df=as.integer(n[3,2] + n[1,2]-2),lower.tail = T), qt(0.07/2,df=as.integer(n[3,2]+n[1,2]-2),lower.tail = F),b4$statistic)
+
+t5 <- c(qt(0.07/2,df=as.integer(n[4,2] + n[2,2]-2),lower.tail = T), qt(0.07/2,df=as.integer(n[2,2]+n[4,2]-2),lower.tail = F),b5$statistic)
+
+t6 <- c(qt(0.07/2,df=as.integer(n[1,2] + n[4,2]-2),lower.tail = T), qt(0.07/2,df=as.integer(n[1,2]+n[4,2]-2),lower.tail = F),b6$statistic)
+
+regiones.criticas <- as_tibble(cbind(g,rbind(t1,t2,t3,t4,t5,t6)))
+colnames(regiones.criticas) <- c("mu1-mu2","Valor critico INF","Valor Critico SUP", "Valor t" )
+regiones.criticas
+```
+
+<div style="text-align: justify">
+**b)Mencione los supuestos que está haciendo sobre cada población, si las muestras son dependientes o independientes y si se puede pensar en varianzas poblacionales iguales. Para esto  ́ultimo realice un contraste de hipótesis bilateral con una significancia del 2 % e interprete el resultado.**
+
+Para cada grupo, estamos suponiendo independencia y normalidad, es decir la emisión de CO2 con gasolina regular no depende de la emisión de CO2 con gasolina premium, y así con cualquiera de los grupos.
+
+
+```{r , warning=FALSE}
+# Las hipótesis a contrastar son: H0:sigmax2/sigmay2=1   vs  Ha: sigmax2/sigmay2!=1
+ #se busca no rechazar Ho p-value > 0.02
+
+#El estadístico de prueba es el F, que sirve para la camparación de varianzas entre problaciones, el cual sigue la distribución F.
+
+
+# HO:La razón de varianzas entre la emisión CO2 con gasolina premium  y  la emisión de CO2 con gasolina regular es igual a 1.
+# H1:La razón de varianzas entre la emisión CO2 con gasolina premium  y  la emisión de CO2 con gasolina regular no es igual a 1.
+
+
+(c1<- var.test(CO2_premium$CO2,CO2_regular$CO2,alternative="two.sided",conf.level = 0.98)) #No se rechaza Ho, puesto que el intervalo de confianza incluye el 1,entonces se concluye que las varianzas de las emisiones de CO2 entre ambos tipos de gasolina (gasolina premium y gasolina regular) son iguales.
+
+
+# HO:La razón de varianzas entre la emisión CO2 con ethanol  y  la emisión de CO2 con diesel es igual a 1.
+# H1:La razón de varianzas entre la emisión CO2 con ethanol  y  la emisión de CO2 con diesel no es igual a 1.
+
+(c2 <- var.test(CO2_etanol$CO2,CO2_disel$CO2,conf.level = 0.98,alternative="two.sided")) #No se rechaza Ho ,puesto que el intervalo de confianza incluye el 1, entonces se concluye que las varianzas de las emisiones de CO2 entre ambos tipos de combustible(etanol y diesel) son iguales.
+
+
+# HO:La razón de varianzas entre la emisión CO2 con gasolina premium  y  la emisión de CO2 con ethanol es igual a 1.
+# H1:La razón de varianzas entre la emisión CO2 con gasolina premium  y  la emisión de CO2 con ethanol no es igual a 1
+
+(c3 <- var.test(CO2_premium$CO2,CO2_etanol$CO2,conf.level = 0.98,alternative="two.sided")) # se rechaza Ho,ya que el intervalo no contiene al 1, por lo que las varianzas no son iguales entre la gasolina premium y el ethanol.
+
+
+# HO:La razón de varianzas entre la emisión CO2 con gasolina premium  y  la emisión de CO2 con diesel es igual a 1.
+# H1:La razón de varianzas entre la emisión CO2 con gasolina premium  y  la emisión de CO2 con diesel no es igual a 1
+
+(c4 <- var.test(CO2_premium$CO2,CO2_disel$CO2,conf.level = 0.98,alternative="two.sided")) # se rechaza Ho,ya que el intervalo no contiene al 1, por lo que las varianzas no son iguales entre la gasolina premium y el deisel
+
+
+# HO:La razón de varianzas la emisión CO2 con gasolina regular  y  la emisión de CO2 con ethanol  es igual a 1.
+# H1:La razón de varianzas entre la emisión CO2 con gasolina regular  y  la emisión de CO2 con ethanol  no es igual a 1.
+
+(c5 <- var.test(CO2_regular$CO2,CO2_etanol$CO2,conf.level = 0.98,alternative="two.sided"))# se rechaza Ho,ya que el intervalo no contiene al 1, por lo que las varianzas no son iguales entre la gasolina regular y el ethanol.
+
+
+# HO:La razón de varianzas entre la emisión CO2 con gasolina regular  y  la emisión de CO2 con diesel es igual a 1.
+# H1:La razón de varianzas entre la emisión CO2 con gasolina regular  y  la emisión de CO2 con diesel es igual no es igual a 1.
+
+(c6 <- var.test(CO2_regular$CO2,CO2_disel$CO2,conf.level = 0.98,alternative="two.sided"))# se rechaza Ho,ya que el intervalo no contiene al 1, por lo que las varianzas no son iguales entre la gasolina preregular y el diesel
+
+
+```
+
+### Regiones críticas y valor F encontrado
+
+```{r, warning=FALSE}
+
+
+v1 <- c(qf(0.02/2,df1=as.integer(n[3,2] -1) , df2=as.integer(n[4,2]-1),lower.tail = T),qf(0.02/2,df1=as.integer(n[3,2] -1) , df2=as.integer(n[4,2]-1),lower.tail = F),c1$statistic  )
+
+v2 <- c(qf(0.02/2,df1=as.integer(n[2,2]-1), df2= as.integer(n[1,2]-1),lower.tail = T), qf(0.02/2,df1=as.integer(n[2,2]-1), df2= as.integer(n[1,2]-1),lower.tail = F),c2$statistic)
+
+v3 <- c(qf(0.02/2,df1 =as.integer(n[3,2] -1) , df2 = as.integer(n[2,2]-1),lower.tail = T), qf(0.02/2,df1 =as.integer(n[3,2] -1) , df2 = as.integer(n[2,2]-1),lower.tail = F),c3$statistic)
+
+v4 <- c( qf(0.02/2,df1=as.integer(n[3,2]-1) , df2 = as.integer(n[1,2]-1),lower.tail = T),qf(0.02/2,df1=as.integer(n[3,2]-1) , df2 = as.integer(n[1,2]-1),lower.tail = F),c4$statistic)
+
+v5 <- c(qf(0.02/2,df1 =as.integer(n[4,2] -1 ), df2= as.integer(n[2,2]-1),lower.tail = T),qf(0.02/2,df1 =as.integer(n[4,2] -1 ), df2= as.integer(n[2,2]-1),lower.tail = F),c5$statistic)
+
+v6 <- c( qf(0.02/2,df1=as.integer(n[4,2]-1), df2=as.integer(n[1,2]-1),lower.tail = T),qf(0.02/2,df1=as.integer(n[4,2]-1), df2=as.integer(n[1,2]-1),lower.tail = F),c6$statistic)
+
+regiones.criticas.var <- as_tibble(cbind(g,rbind(v1,v2,v3,v4,v5,v6)))
+colnames(regiones.criticas.var) <- c("sigmax/sigmay","-Valor Critico ","+Valor Critico","Valor F" )
+regiones.criticas.var
+```
+# Conclusiones
+
+De acuerdo  a lo anterior se concluye lo siguiente:
+
+## Exploratorio
+
+1. El combustible más usado por los automóviles es la gasolina regular($0.4926$),mientras que el menos usado es el diesel($0.0237$).
+2.Existe una correlación fuerte positiva ($r=0.92$) entre el consumo de combustible y las emisiones de CO2, es decir a mayor consumo de combustible mayores emisiones de CO2.
+3. La gasolina regular y la premium son las que emiten mayores cantidades de CO2.
+4. Para la emisión de CO2 por tipo de combustible se concluyo que podría existir una similitud entre la dispersión de los datos entre la gasolina premium y la regular, así como entre el diesel y ethanol.
+
+## Inferencial
+
+1.La distribución que siguen los datos para la emisión de CO2, se propone que sea una Gamma con parámetros $\beta= 18.462281131$ y $\alpha =0.073675290$ y para el Consumo de Gasolina una Log-Normal con parámetros $log \mu=2.362378028$ y $log \sigma=0.257356569$, ya que son los que presentan un BIC menor. Para el caso del tipo de combustible se propone una distribución poisson con $\lambda=3.39504334$.
+
+2.Con respecto a los intervalos encontramos que en promedio la gasolina premium y regular emiten las mayores cantidades de CO2, pero entre entre estas la premium es la que emite más, con respecto a pruebas de hipótesis de varianzas iguales, se encontró que están llegan a presentar igualdad de varianzas. Para el caso de los dos combustibles restantes, se confirmo que el ethanol en promedio produce mas cantidades de CO2 que el diesel,pero de igual forma pueden llegar a presentar varianzas iguales. 
+
+
+Finalmente, se llega a la conclusión que cualquier tipo de combustible produce grandes cantidades de CO2, aunque entre estos 4, el diesel produzca menos CO2, la cantidad de automóviles y camiones que hacen uso de este combustible es poca,sin embargo, la gasolina es de más uso dado que hay mas automóviles en el mercado, así  que las alternativas que se proponen es reducir el uso de automóviles mediante un correcto proceso de verificación, y buscar reemplazar estos automóviles por autos eléctricos. 
+
+<div/>
